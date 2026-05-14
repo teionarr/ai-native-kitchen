@@ -15,8 +15,8 @@
 search: ~  # null — no provider configured yet; route handlers return 503 until set
 
 # Scraping — JS-rendered page → structured text
-# Free tier provider lands in PR-2.3b (Firecrawl: 1K credits/mo)
-scraping: ~
+# Firecrawl: free tier 1000 credits/month. Requires KITCHEN_FIRECRAWL_API_KEY.
+scraping: firecrawl
 
 # Traffic & demand — organic search visibility, demand trends
 # Free tier provider lands in PR-2.3f (Google Trends via pytrends)
