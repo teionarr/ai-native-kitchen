@@ -30,6 +30,7 @@ from src.routes import scraping as scraping_route
 from src.routes import search as search_route
 from src.routes import tech as tech_route
 from src.routes import traffic as traffic_route
+from src.routes import verify as verify_route
 from src.version import VERSION
 
 log = logging.getLogger("kitchen")
@@ -62,6 +63,7 @@ app.include_router(search_route.router)
 app.include_router(people_route.router)
 app.include_router(tech_route.router)
 app.include_router(traffic_route.router)
+app.include_router(verify_route.router)
 
 
 @app.middleware("http")
