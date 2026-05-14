@@ -25,11 +25,8 @@ dev = [
     "httpx>=0.27,<1.0",  # also used as test client
 ]
 
-# Service code lives in src/ but the directory is empty until PR-2.1 lands the FastAPI
-# app. Until then, tell setuptools there are no packages so the editable install works.
-# When PR-2.1 lands, switch this to packages = ["src"].
 [tool.setuptools]
-packages = []
+packages = ["src"]
 
 [tool.ruff]
 line-length = 120

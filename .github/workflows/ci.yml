@@ -105,3 +105,24 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    # Builds the container image (no push). Validates the Dockerfile, the pinned
+    # base image digest, the doppler install, and that pip install -e . succeeds.
+    # Does NOT yet run the container — that's PR-2.2 (docker-compose).
+    # NOT yet a required check on branch protection — will become required after
+    # PR-2.2 validates the full container can start and respond to /health.
+    runs-on: ubuntu-latest
+    name: docker
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: ai-native-kitchen:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
