@@ -1,0 +1,70 @@
+# Caddy snippet for hosting the kitchen behind your existing Caddy install on the VM.
+#
+# Install:
+#   sudo install -d -o ai-native-kitchen -g ai-native-kitchen -m 0750 /etc/ai-native-kitchen/caddy
+#   sudo cp deploy/caddy/ai-native-kitchen.caddy.example /etc/ai-native-kitchen/caddy/ai-native-kitchen.caddy
+#   sudo $EDITOR /etc/ai-native-kitchen/caddy/ai-native-kitchen.caddy   # set your domain
+#   echo "import /etc/ai-native-kitchen/caddy/*.caddy" | sudo tee -a /etc/caddy/Caddyfile
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo caddy reload --config /etc/caddy/Caddyfile
+#
+# Two subdomains:
+#   api.{your-domain}     → kitchen-service on 127.0.0.1:18080
+#   briefs.{your-domain}  → static brief-host directory
+# Apex domain is NEVER touched.
+
+# ---- API endpoint ---------------------------------------------------------------------------
+
+api.YOUR_DOMAIN_HERE {
+    reverse_proxy 127.0.0.1:18080 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto https
+    }
+
+    # Security headers — public API surface should be locked down.
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        # Don't leak server identity
+        -Server
+    }
+
+    # Structured access log (Caddy → journald → existing observability stack)
+    log {
+        output stdout
+        format json
+        # Don't log healthchecks (Caddy's own + docker's)
+        level INFO
+    }
+}
+
+# ---- Static brief-host ----------------------------------------------------------------------
+
+briefs.YOUR_DOMAIN_HERE {
+    root * /var/lib/ai-native-kitchen/briefs
+    file_server
+
+    # Strict CSP — briefs contain no JS by design (vanilla CSS + native <details>).
+    header {
+        Content-Security-Policy "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' https:"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+
+    # Optional bearer token. Set BRIEF_HOST_BEARER_TOKEN in Caddy's env (via Doppler or
+    # systemd EnvironmentFile) to require Authorization on every request.
+    @noauth not header Authorization "Bearer {$BRIEF_HOST_BEARER_TOKEN:disabled}"
+    handle @noauth {
+        # If the env var is set to anything other than "disabled", the bearer is required.
+        @needsAuth `{env.BRIEF_HOST_BEARER_TOKEN} != "disabled" && {env.BRIEF_HOST_BEARER_TOKEN} != ""`
+        respond @needsAuth 401
+    }
+
+    log {
+        output stdout
+        format json
+    }
+}

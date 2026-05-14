@@ -107,22 +107,72 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   docker:
-    # Builds the container image (no push). Validates the Dockerfile, the pinned
-    # base image digest, the doppler install, and that pip install -e . succeeds.
-    # Does NOT yet run the container — that's PR-2.2 (docker-compose).
-    # NOT yet a required check on branch protection — will become required after
-    # PR-2.2 validates the full container can start and respond to /health.
+    # Builds the image, validates docker-compose.yml syntax, starts the service
+    # container in isolation (no redis/postgres yet — service /health doesn't need
+    # them), and asserts /health responds with the expected JSON shape. End-to-end
+    # gate. Should become a required check on branch protection after this PR merges.
     runs-on: ubuntu-latest
     name: docker
     steps:
       - uses: actions/checkout@v6
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build image
+
+      - name: Validate docker-compose.yml syntax
+        run: |
+          # Dummy env so variable substitution works during config validation.
+          REDIS_PASSWORD=ci POSTGRES_PASSWORD=ci docker compose config > /dev/null
+          echo "✓ docker-compose.yml is valid"
+
+      - name: Build image (load locally)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: false
+          load: true
           tags: ai-native-kitchen:ci-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Start service container
+        run: |
+          docker run -d \
+            --name kitchen-service-ci \
+            -p 8000:8000 \
+            ai-native-kitchen:ci-${{ github.sha }}
+
+      - name: Wait for /health to respond
+        run: |
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:8000/health > /dev/null; then
+              echo "✓ /health responding after ${i}s"
+              echo "Response:"
+              curl -s http://127.0.0.1:8000/health | python3 -m json.tool
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "✗ /health did not respond within 20s"
+          docker logs kitchen-service-ci
+          exit 1
+
+      - name: Verify response shape
+        run: |
+          response=$(curl -s http://127.0.0.1:8000/health)
+          echo "$response" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          assert d.get('status') == 'ok', f'status not ok: {d}'
+          assert isinstance(d.get('version'), str), f'version missing: {d}'
+          assert isinstance(d.get('uptime_s'), int), f'uptime_s missing: {d}'
+          print('✓ response shape valid')
+          "
+
+      - name: Container logs (always, for debugging)
+        if: always()
+        run: docker logs kitchen-service-ci || true
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f kitchen-service-ci || true
