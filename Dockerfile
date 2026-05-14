@@ -52,7 +52,7 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).status == 200 else 1)"
 
-# Doppler-aware entrypoint. If DOPPLER_TOKEN is set or the CLI is configured,
-# use `doppler run` to inject secrets. Otherwise fall back to plain uvicorn so
-# the image is still useful in CI / local dev where Doppler may not be set up.
-CMD ["sh", "-c", "if [ -n \"$DOPPLER_TOKEN\" ] || doppler configure get token >/dev/null 2>&1; then exec doppler run --silent-exit -- uvicorn src.main:app --host 0.0.0.0 --port 8000; else exec uvicorn src.main:app --host 0.0.0.0 --port 8000; fi"]
+# Doppler-aware entrypoint. If DOPPLER_TOKEN is set, use `doppler run` to inject
+# secrets. Otherwise fall back to plain uvicorn so the image is still useful in
+# CI / local dev where Doppler may not be set up.
+CMD ["sh", "-c", "if [ -n \"$DOPPLER_TOKEN\" ]; then exec doppler run -- uvicorn src.main:app --host 0.0.0.0 --port 8000; else exec uvicorn src.main:app --host 0.0.0.0 --port 8000; fi"]
