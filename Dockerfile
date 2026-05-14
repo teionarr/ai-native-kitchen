@@ -9,14 +9,21 @@ LABEL org.opencontainers.image.source="https://github.com/teionarr/ai-native-kit
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.description="ai-native-kitchen — shared FastAPI service for the AI-lead skills ecosystem"
 
-# Doppler CLI for runtime secret injection. Install while still root, then drop.
-# We purge the install toolchain right after to keep the image small + reduce
-# the attack surface (curl/gnupg shouldn't be reachable inside a running container).
+# Doppler CLI for runtime secret injection. Install via Doppler's official apt repo
+# (more deterministic than the shell installer, which has issues with the gpg binary
+# name on Debian 13). Purge the install toolchain after — curl + gnupg should not be
+# reachable inside the running container.
 # hadolint ignore=DL3008,DL3015
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl gnupg ca-certificates \
- && (curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh | sh) \
- && apt-get purge -y curl gnupg \
+ && apt-get install -y --no-install-recommends curl gpg gnupg ca-certificates \
+ && curl -sLf --retry 3 --tlsv1.2 --proto "=https" \
+        https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key \
+        | gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg \
+ && echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" \
+        > /etc/apt/sources.list.d/doppler-cli.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends doppler \
+ && apt-get purge -y curl gpg gnupg \
  && apt-get autoremove -y \
  && rm -rf /var/lib/apt/lists/*
 
