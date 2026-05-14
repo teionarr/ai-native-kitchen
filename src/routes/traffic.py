@@ -1,10 +1,11 @@
-"""POST /traffic — wraps the active traffic provider (none configured yet → 503)."""
+"""POST /traffic — wraps the active traffic provider (today: Google Trends)."""
 
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from src import cache
 from src.auth import require_skill
 from src.routes._unconfigured import raise_signal_unconfigured
 from src.upstreams import get_active_provider
@@ -38,14 +39,33 @@ async def traffic(
             detail="traffic provider misconfigured (wrong type)",
         )
 
+    cache_payload = {"domain": body.domain}
+    cached = await cache.get("traffic", provider.name, cache_payload)
+    if cached is not None:
+        log.info("traffic cache hit", extra={"skill_id": skill_id, "domain": body.domain})
+        try:
+            return TrafficResult.model_validate(cached)
+        except Exception:
+            log.exception("cached traffic payload failed validation; refetching")
+
     log.info("traffic lookup", extra={"skill_id": skill_id, "domain": body.domain})
     try:
-        return await provider.lookup(body.domain)
+        result = await provider.lookup(body.domain)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    except RuntimeError as e:
+        log.warning("traffic provider error: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"upstream traffic provider failed: {e}",
+        ) from e
     except Exception:
         log.exception("traffic lookup failed")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="upstream traffic provider failed",
         ) from None
+
+    # Trends data updates daily but slow to swing — fact TTL (24h)
+    await cache.set("traffic", provider.name, cache_payload, result.model_dump(mode="json"), ttl_kind="fact")
+    return result

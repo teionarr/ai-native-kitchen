@@ -17,6 +17,7 @@ dependencies = [
     "pyyaml>=6.0,<7.0",
     "python-Wappalyzer>=0.3.1,<1.0",  # tech fingerprinting; pure-python, no browser
     "setuptools>=70.0,<81",  # provides pkg_resources for python-Wappalyzer; setuptools 81+ removed it
+    "pytrends>=4.9,<5.0",  # Google Trends scraper for the traffic provider; fragile but free
 ]
 
 [project.optional-dependencies]
