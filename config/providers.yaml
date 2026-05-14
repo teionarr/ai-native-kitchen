@@ -19,8 +19,10 @@ search: exa
 scraping: firecrawl
 
 # Traffic & demand — organic search visibility, demand trends
-# Free tier provider lands in PR-2.3f (Google Trends via pytrends)
-traffic: ~
+# Google Trends via pytrends: free, no API key. Returns top_keywords +
+# growth_indicator (growing/flat/declining). NOT absolute visit counts —
+# swap to SimilarWeb/Semrush for those.
+traffic: google_trends
 
 # Funding — rounds, investors, public-company filings
 # SEC EDGAR is free, no API key, US public companies only.

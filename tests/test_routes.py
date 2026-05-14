@@ -53,12 +53,14 @@ async def test_providers_shows_funding_active_as_sec_edgar(client: AsyncClient) 
     assert "sec_edgar" in funding["registered"]
 
 
-async def test_providers_shows_unconfigured_signals_as_null(client: AsyncClient) -> None:
-    """Pick whichever signal is still unconfigured at this point in the build (traffic
-    until the Google Trends provider lands)."""
+async def test_providers_shows_all_signals_configured(client: AsyncClient) -> None:
+    """As of the Google Trends PR, all 6 signals have an active provider. This test
+    is the inversion of the original "shows unconfigured signals as null" — kept
+    around so a future regression that drops a provider gets caught here."""
     resp = await client.get("/providers")
-    traffic = next(s for s in resp.json()["signals"] if s["signal"] == "traffic")
-    assert traffic["active"] is None
+    by_signal = {s["signal"]: s for s in resp.json()["signals"]}
+    for signal in ("search", "scraping", "traffic", "funding", "people", "tech"):
+        assert by_signal[signal]["active"] is not None, f"{signal} unexpectedly has no active provider"
 
 
 # ---- /funding (wired to SEC EDGAR) ---------------------------------------------------------
@@ -161,23 +163,9 @@ async def test_funding_rejects_oversized_company(client: AsyncClient, env_token:
     assert resp.status_code == 422
 
 
-# ---- Unconfigured signals → 503 -----------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "path,body",
-    [
-        ("/people", {"company": "Apple Inc."}),
-        ("/tech", {"primary_url": "https://example.com"}),
-        ("/traffic", {"domain": "example.com"}),
-    ],
-)
-async def test_unconfigured_signal_returns_503(client: AsyncClient, env_token: str, path: str, body: dict) -> None:
-    resp = await client.post(path, json=body, headers={"Authorization": f"Bearer {env_token}"})
-    assert resp.status_code == 503
-    detail = resp.json()["detail"]
-    assert detail["error"] == "signal_unconfigured"
-    assert detail["signal"] in {"people", "tech", "traffic"}
+# ---- 503 path is now per-provider — see each provider's tests for "no API key → 503" ---------
+# (When a signal had no provider in providers.yaml, the route returned 503; that path is now
+# tested by per-provider tests like test_apollo.py::test_people_route_503_when_no_api_key.)
 
 
 async def test_traffic_rejects_invalid_domain(client: AsyncClient, env_token: str) -> None:
