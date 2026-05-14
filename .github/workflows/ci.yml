@@ -1,0 +1,107 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: lint
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dev deps
+        run: pip install -e '.[dev]'
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Validate YAML files
+        run: |
+          set -e
+          python <<'PY'
+          import sys, pathlib, yaml
+          for p in pathlib.Path(".").rglob("*.y*ml"):
+              if any(part in (".venv", "node_modules", ".git") for part in p.parts):
+                  continue
+              try:
+                  yaml.safe_load(p.read_text())
+                  print(f"✓ {p}")
+              except Exception as e:
+                  print(f"✗ {p}: {e}", file=sys.stderr)
+                  sys.exit(1)
+          PY
+
+      - name: Validate JSON files
+        run: |
+          set -e
+          for f in $(find . -name '*.json' -not -path './node_modules/*' -not -path './.git/*' -not -path './.venv/*'); do
+            python -m json.tool "$f" > /dev/null
+            echo "✓ $f"
+          done
+
+  test:
+    runs-on: ubuntu-latest
+    name: test
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dev deps
+        run: pip install -e '.[dev]'
+
+      - name: Run pytest
+        run: pytest -q
+
+  schema:
+    runs-on: ubuntu-latest
+    name: schema
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate config/providers.yaml has required signals (when it lands)
+        run: |
+          if [ -f config/providers.yaml ]; then
+            python <<'PY'
+          import sys, yaml
+          required = {"search", "scraping", "traffic", "funding", "people", "tech"}
+          providers = yaml.safe_load(open("config/providers.yaml"))
+          missing = required - set(providers.keys())
+          if missing:
+              print(f"providers.yaml missing required signals: {missing}", file=sys.stderr)
+              sys.exit(1)
+          print(f"✓ providers.yaml configures all required signals")
+          PY
+          else
+            echo "providers.yaml not yet present (lands in PR-2.3) — skipping"
+          fi
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    name: gitleaks
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

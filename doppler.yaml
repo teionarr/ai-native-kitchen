@@ -1,0 +1,17 @@
+# Doppler project/config linkage.
+#
+# Safe to commit (no secrets — only the project + config name to bind to).
+# Actual secret values live in Doppler's cloud, accessed at runtime via `doppler run`.
+#
+# Local development:
+#   doppler login
+#   doppler setup --project ai-native-kitchen --config dev
+#   doppler run -- uvicorn src.main:app --reload
+#
+# Production (on the VM):
+#   The container runs `doppler run -- uvicorn src.main:app` with DOPPLER_TOKEN
+#   set to a read-only service token scoped to ai-native-kitchen/prd.
+
+setup:
+  project: ai-native-kitchen
+  config: dev

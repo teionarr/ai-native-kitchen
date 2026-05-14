@@ -1,0 +1,41 @@
+# Secrets — NEVER commit. Doppler is the only source of truth.
+.env
+.env.*
+!.env.example
+.doppler/
+*.pem
+*.key
+*-token
+*.tok
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Docker / runtime artifacts
+docker-compose.override.yml
+*.log
+
+# Local data (Postgres / Redis dumps if anyone runs containers locally)
+data/
+dump.rdb
+*.sql.bak
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local brief outputs (production briefs are written to /var/lib/ai-native-kitchen/briefs/)
+briefs/
+*.brief.html
