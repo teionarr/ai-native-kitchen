@@ -1,0 +1,144 @@
+# docker-compose.yml — local dev + the canonical layout we deploy on the VM.
+#
+# All containers: non-root, read-only root FS (with explicit tmpfs for writeable areas),
+# cap_drop ALL, no-new-privileges, internal docker network. No new external host ports
+# beyond loopback bindings — public access is only via the existing reverse proxy on
+# the VM (see deploy/caddy/ or deploy/nginx/ for snippets).
+#
+# Required env (provided by Doppler in prod, by `.env.compose` for local dev):
+#   - DOPPLER_TOKEN          (optional in dev; required in prod for secret injection)
+#   - REDIS_PASSWORD         (any non-empty string)
+#   - POSTGRES_PASSWORD      (any non-empty string)
+#
+# Bring up:
+#   docker compose --env-file .env.compose up -d
+# Tear down:
+#   docker compose down -v        # -v also drops named volumes
+
+name: ai-native-kitchen
+
+networks:
+  kitchen-net:
+    driver: bridge
+    name: kitchen-net
+
+volumes:
+  kitchen-redis-data:
+  kitchen-postgres-data:
+  kitchen-briefs:
+
+services:
+  service:
+    build: .
+    image: ai-native-kitchen:local
+    container_name: kitchen-service
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    # Loopback-only: external traffic reaches us only via the existing reverse proxy.
+    ports:
+      - "127.0.0.1:18080:8000"
+    environment:
+      KITCHEN_PORT: "8000"
+      KITCHEN_LOG_LEVEL: "info"
+      KITCHEN_ENABLE_DOCS: "false"
+      DOPPLER_TOKEN: "${DOPPLER_TOKEN:-}"
+      KITCHEN_REDIS_URL: "redis://:${REDIS_PASSWORD:-changeme}@kitchen-redis:6379/0"
+      KITCHEN_POSTGRES_DSN: "postgresql://kitchen:${POSTGRES_PASSWORD:-changeme}@kitchen-postgres:5432/kitchen"
+    networks:
+      - kitchen-net
+    depends_on:
+      kitchen-redis:
+        condition: service_healthy
+      kitchen-postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).status == 200 else 1)"
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  kitchen-redis:
+    # Pinned digest of redis:7-alpine resolved at PR time.
+    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    container_name: kitchen-redis
+    user: "999:1000"  # redis user inside the official image
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    # No host port — only reachable from inside kitchen-net.
+    command:
+      - redis-server
+      - --requirepass
+      - "${REDIS_PASSWORD:-changeme}"
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - "256mb"
+      - --maxmemory-policy
+      - allkeys-lru
+    volumes:
+      - kitchen-redis-data:/data
+    networks:
+      - kitchen-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  kitchen-postgres:
+    # Pinned digest of postgres:16-alpine resolved at PR time.
+    image: postgres:16-alpine@sha256:4e6e670bb069649261c9c18031f0aded7bb249a5b6664ddec29c013a89310d50
+    container_name: kitchen-postgres
+    # Postgres needs a few caps for its init / setuid dance — drop ALL then add back the minimum.
+    user: "999:999"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/postgresql
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    # Loopback-only host port for local debugging via psql; close it in prod by overriding.
+    ports:
+      - "127.0.0.1:18432:5432"
+    environment:
+      POSTGRES_USER: kitchen
+      POSTGRES_DB: kitchen
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-changeme}"
+      # Keep checkpoints small for the cost-log workload (mostly inserts).
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - kitchen-postgres-data:/var/lib/postgresql/data
+    networks:
+      - kitchen-net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kitchen", "-d", "kitchen"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
