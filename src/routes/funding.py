@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from src import cache
 from src.auth import require_skill
 from src.upstreams import get_active_provider
 from src.upstreams.funding._base import FundingProvider, FundingResult
@@ -42,9 +43,18 @@ async def funding(
             detail="funding provider misconfigured (wrong type)",
         )
 
+    cache_payload = {"company": body.company}
+    cached = await cache.get("funding", provider.name, cache_payload)
+    if cached is not None:
+        log.info("funding cache hit", extra={"skill_id": skill_id, "company": body.company})
+        try:
+            return FundingResult.model_validate(cached)
+        except Exception:
+            log.exception("cached funding payload failed validation; refetching")
+
     log.info("funding lookup", extra={"skill_id": skill_id, "company": body.company})
     try:
-        return await provider.lookup(body.company)
+        result = await provider.lookup(body.company)
     except ValueError as e:
         # Provider rejected the input — treat as 422.
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
@@ -54,3 +64,7 @@ async def funding(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="upstream funding provider failed; try again or check logs",
         ) from None
+
+    # Funding data is static-ish — filings come quarterly, founders rarely change.
+    await cache.set("funding", provider.name, cache_payload, result.model_dump(mode="json"), ttl_kind="static")
+    return result
