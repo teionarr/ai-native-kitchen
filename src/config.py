@@ -76,6 +76,14 @@ class Settings(BaseSettings):
             "month. Required for the exa search provider."
         ),
     )
+    apollo_api_key: str | None = Field(
+        default=None,
+        description=(
+            "Apollo.io API key — get one at https://apollo.io. Free tier is "
+            "60 credits/month (1 credit per organization enrichment). Required "
+            "for the apollo people provider."
+        ),
+    )
 
 
 settings = Settings()
