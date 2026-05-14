@@ -32,5 +32,6 @@ funding: sec_edgar
 people: ~
 
 # Tech — frontend / backend / infra fingerprinting
-# Free tier provider lands in PR-2.3c (Wappalyzer OSS CLI, runs locally)
-tech: ~
+# python-Wappalyzer: free, pure-python (no browser). Fingerprints aren't actively
+# maintained but cover the common stack. Swap for wappalyzer-next when stale.
+tech: wappalyzer_oss
