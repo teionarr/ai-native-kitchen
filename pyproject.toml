@@ -23,6 +23,7 @@ dev = [
     "pytest-asyncio>=0.24,<2.0",
     "ruff==0.15.12",
     "httpx>=0.27,<1.0",  # also used as test client
+    "fakeredis>=2.26,<3.0",  # in-process Redis for cache tests; no real Redis needed
 ]
 
 [tool.setuptools]
@@ -56,3 +57,6 @@ ignore = [
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
 asyncio_mode = "auto"
+# Add the repo root to sys.path so `from src...` imports work consistently across
+# fresh installs / cache states. Belt + suspenders alongside the editable install.
+pythonpath = ["."]

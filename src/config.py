@@ -37,6 +37,14 @@ class Settings(BaseSettings):
         default=False,
         description="Expose /docs OpenAPI UI. Off in production.",
     )
+    redis_url: str | None = Field(
+        default=None,
+        description=(
+            "redis://[:password@]host:port/db — when set, the cache layer uses this "
+            "Redis instance to cache provider lookups. When unset (or unreachable), "
+            "the cache is disabled and every request hits the upstream provider."
+        ),
+    )
 
 
 settings = Settings()
