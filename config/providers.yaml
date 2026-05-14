@@ -27,9 +27,10 @@ traffic: ~
 funding: sec_edgar
 
 # People — org chart, leadership, recent hires
-# Free tier provider lands in PR-2.3e (Apollo: 60 credits/mo)
-# Note: LinkedIn proper is plugin-side via the LinkedIn MCP, not here.
-people: ~
+# Apollo: free tier 60 credits/month. Headcount + basic org facts only;
+# leadership lookup is paid-tier and isn't wired today.
+# LinkedIn proper is plugin-side via the LinkedIn MCP, not here.
+people: apollo
 
 # Tech — frontend / backend / infra fingerprinting
 # python-Wappalyzer: free, pure-python (no browser). Fingerprints aren't actively

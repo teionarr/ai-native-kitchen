@@ -54,9 +54,11 @@ async def test_providers_shows_funding_active_as_sec_edgar(client: AsyncClient) 
 
 
 async def test_providers_shows_unconfigured_signals_as_null(client: AsyncClient) -> None:
+    """Pick whichever signal is still unconfigured at this point in the build (traffic
+    until the Google Trends provider lands)."""
     resp = await client.get("/providers")
-    people = next(s for s in resp.json()["signals"] if s["signal"] == "people")
-    assert people["active"] is None
+    traffic = next(s for s in resp.json()["signals"] if s["signal"] == "traffic")
+    assert traffic["active"] is None
 
 
 # ---- /funding (wired to SEC EDGAR) ---------------------------------------------------------

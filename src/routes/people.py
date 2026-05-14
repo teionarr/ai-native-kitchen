@@ -1,10 +1,11 @@
-"""POST /people — wraps the active people provider (none configured yet → 503)."""
+"""POST /people — wraps the active people provider (today: Apollo)."""
 
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from src import cache
 from src.auth import require_skill
 from src.routes._unconfigured import raise_signal_unconfigured
 from src.upstreams import get_active_provider
@@ -38,14 +39,33 @@ async def people(
             detail="people provider misconfigured (wrong type)",
         )
 
+    cache_payload = {"company": body.company}
+    cached = await cache.get("people", provider.name, cache_payload)
+    if cached is not None:
+        log.info("people cache hit", extra={"skill_id": skill_id, "company": body.company})
+        try:
+            return PeopleResult.model_validate(cached)
+        except Exception:
+            log.exception("cached people payload failed validation; refetching")
+
     log.info("people lookup", extra={"skill_id": skill_id, "company": body.company})
     try:
-        return await provider.lookup(body.company)
+        result = await provider.lookup(body.company)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    except RuntimeError as e:
+        log.warning("people provider error: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"upstream people provider failed: {e}",
+        ) from e
     except Exception:
         log.exception("people lookup failed")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="upstream people provider failed",
         ) from None
+
+    # Headcount + org facts change quarterly-ish; static TTL (7d) is appropriate.
+    await cache.set("people", provider.name, cache_payload, result.model_dump(mode="json"), ttl_kind="static")
+    return result
