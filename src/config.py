@@ -45,6 +45,23 @@ class Settings(BaseSettings):
             "the cache is disabled and every request hits the upstream provider."
         ),
     )
+    postgres_dsn: str | None = Field(
+        default=None,
+        description=(
+            "postgresql://user:pass@host:port/db — when set, every authenticated "
+            "request is recorded in the cost_log table for telemetry + daily-cap "
+            "enforcement. When unset (or unreachable), telemetry silently no-ops."
+        ),
+    )
+    max_daily_usd_per_skill: float = Field(
+        default=20.0,
+        ge=0,
+        description=(
+            "Per-skill daily USD cap (sum of upstream_cost_usd across all calls "
+            "from a skill in the last 24h). Above this, requests get 429 until "
+            "midnight rolls. Set to 0 to disable the cap (telemetry still records)."
+        ),
+    )
 
 
 settings = Settings()

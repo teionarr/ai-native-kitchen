@@ -25,6 +25,9 @@ import os
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from src import cost
+from src.config import settings
+
 _BEARER_TOKEN_ENV_PREFIX = "SERVICE_BEARER_TOKEN_"  # noqa: S105 — env var name prefix, not a password
 
 # `auto_error=False` so we control the 401 message and shape ourselves.
@@ -75,4 +78,23 @@ async def require_skill(
             headers={"WWW-Authenticate": "Bearer"},
         )
     request.state.skill_id = skill_id
+
+    # Daily-cap enforcement. settings.max_daily_usd_per_skill = 0 disables the check.
+    if settings.max_daily_usd_per_skill > 0:
+        spent = await cost.daily_total(skill_id)
+        if spent >= settings.max_daily_usd_per_skill:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "error": "daily_cap_exceeded",
+                    "skill_id": skill_id,
+                    "spent_usd": round(spent, 4),
+                    "cap_usd": settings.max_daily_usd_per_skill,
+                    "message": (
+                        "skill exceeded its 24h USD cap. Cap rolls when the oldest "
+                        "request from the skill ages out (24h sliding window)."
+                    ),
+                },
+            )
+
     return skill_id

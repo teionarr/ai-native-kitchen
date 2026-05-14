@@ -22,6 +22,7 @@ from typing import Any
 from fastapi import FastAPI, Request, Response
 
 from src.config import settings
+from src.middleware.cost_telemetry import cost_telemetry_middleware
 from src.routes import funding as funding_route
 from src.routes import people as people_route
 from src.routes import providers as providers_route
@@ -71,6 +72,13 @@ async def request_id_middleware(request: Request, call_next: Callable[[Request],
     response = await call_next(request)
     response.headers["X-Request-Id"] = request_id
     return response
+
+
+# Cost telemetry registered AFTER request_id so it wraps as the outermost layer:
+# requests flow IN through cost_telemetry → request_id → route, and OUT through
+# route → request_id (sets X-Request-Id) → cost_telemetry (records the final status
+# code, including 401s and 429s issued by request_id / auth dependencies).
+app.middleware("http")(cost_telemetry_middleware)
 
 
 @app.get("/health", tags=["meta"])
