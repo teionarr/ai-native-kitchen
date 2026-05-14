@@ -1,0 +1,50 @@
+# Numerical sanity bounds for the verification module.
+#
+# Insights with numerical claims outside these ranges get an "out_of_bounds" issue
+# at severity=warning. The bounds are deliberately loose — the goal is to catch
+# hallucinations and unit errors, not to enforce business assumptions.
+#
+# Edit freely; the verification module re-reads on each request (no restart needed
+# in dev — and a restart is cheap).
+
+headcount:
+  min: 1
+  max: 5_000_000           # Walmart-tier; absolute upper bound
+  yoy_growth_pct:
+    min: -90               # mass layoffs are real; -90% is the floor
+    max: 1000              # 10x in a year is absurd but happens (early-stage)
+
+revenue_usd:
+  min: 0
+  max: 1_000_000_000_000   # 1 trillion; absolute ceiling
+
+arr_usd:
+  min: 0
+  max: 100_000_000_000     # 100B ARR; only the absolute giants
+
+funding_round_usd:
+  min: 1_000               # avoid "raised $1" hallucinations
+  max: 100_000_000_000     # 100B in a single round; cap
+
+valuation_usd:
+  min: 100_000             # avoid penny-stock hallucinations
+  max: 10_000_000_000_000  # 10T; nothing real
+
+founding_year:
+  min: 1700                # could be a centuries-old company in finance/insurance
+  max: 2026                # current year
+
+founder_count:
+  min: 1
+  max: 12                  # any "company has 47 founders" is hallucination
+
+months_between_rounds:
+  min: 0                   # same-day announcements happen
+  max: 240                 # 20 years; absolute ceiling
+
+# Cross-domain disagreement thresholds — verifier flags these as numerical contradictions
+disagreement_thresholds:
+  headcount_pct: 20        # >20% disagreement between two sources = contradiction
+  revenue_multiplier: 2    # >2x disagreement = contradiction
+  arr_multiplier: 2
+  funding_multiplier: 1.1  # funding amounts should be exact; 10% diff = real disagreement
