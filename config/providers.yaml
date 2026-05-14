@@ -1,0 +1,36 @@
+# Active provider per signal. The Strategy pattern in src/upstreams/ uses this file
+# to decide which concrete implementation `get_active_provider("<signal>")` returns.
+#
+# Default config picks free-tier providers. Paid providers can be enabled by:
+#   1. Adding the API key to Doppler (under the right config: dev / stg / prd)
+#   2. Implementing the provider class (if it doesn't exist yet) and decorating it
+#      with @register("<signal>", "<name>")
+#   3. Editing this file to point the signal at the new provider's name
+#   4. Restarting the container
+#
+# Validate this file with: docker compose run --rm service python -c "from src.upstreams import get_active_provider; [get_active_provider(s) for s in ['search','scraping','traffic','funding','people','tech']]"
+
+# Search — semantic web search with citations
+# Free tier providers land in PR-2.3a (Exa: 1K req/mo)
+search: ~  # null — no provider configured yet; route handlers return 503 until set
+
+# Scraping — JS-rendered page → structured text
+# Free tier provider lands in PR-2.3b (Firecrawl: 1K credits/mo)
+scraping: ~
+
+# Traffic & demand — organic search visibility, demand trends
+# Free tier provider lands in PR-2.3f (Google Trends via pytrends)
+traffic: ~
+
+# Funding — rounds, investors, public-company filings
+# SEC EDGAR is free, no API key, US public companies only.
+funding: sec_edgar
+
+# People — org chart, leadership, recent hires
+# Free tier provider lands in PR-2.3e (Apollo: 60 credits/mo)
+# Note: LinkedIn proper is plugin-side via the LinkedIn MCP, not here.
+people: ~
+
+# Tech — frontend / backend / infra fingerprinting
+# Free tier provider lands in PR-2.3c (Wappalyzer OSS CLI, runs locally)
+tech: ~
