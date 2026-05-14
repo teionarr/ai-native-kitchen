@@ -62,6 +62,13 @@ class Settings(BaseSettings):
             "midnight rolls. Set to 0 to disable the cap (telemetry still records)."
         ),
     )
+    firecrawl_api_key: str | None = Field(
+        default=None,
+        description=(
+            "Firecrawl API key — get one at https://firecrawl.dev. Free tier is "
+            "1000 credits/month. Required for the firecrawl scraping provider."
+        ),
+    )
 
 
 settings = Settings()

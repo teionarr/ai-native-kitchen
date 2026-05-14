@@ -26,6 +26,7 @@ from src.middleware.cost_telemetry import cost_telemetry_middleware
 from src.routes import funding as funding_route
 from src.routes import people as people_route
 from src.routes import providers as providers_route
+from src.routes import scraping as scraping_route
 from src.routes import tech as tech_route
 from src.routes import traffic as traffic_route
 from src.version import VERSION
@@ -55,6 +56,7 @@ log.info(
 # Mount routers. Per-signal routers — each consumes get_active_provider("<signal>").
 app.include_router(providers_route.router)
 app.include_router(funding_route.router)
+app.include_router(scraping_route.router)
 app.include_router(people_route.router)
 app.include_router(tech_route.router)
 app.include_router(traffic_route.router)
