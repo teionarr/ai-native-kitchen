@@ -69,6 +69,13 @@ class Settings(BaseSettings):
             "1000 credits/month. Required for the firecrawl scraping provider."
         ),
     )
+    exa_api_key: str | None = Field(
+        default=None,
+        description=(
+            "Exa API key — get one at https://exa.ai. Free tier is 1000 requests/"
+            "month. Required for the exa search provider."
+        ),
+    )
 
 
 settings = Settings()

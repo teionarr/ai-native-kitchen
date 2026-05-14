@@ -11,8 +11,8 @@
 # Validate this file with: docker compose run --rm service python -c "from src.upstreams import get_active_provider; [get_active_provider(s) for s in ['search','scraping','traffic','funding','people','tech']]"
 
 # Search — semantic web search with citations
-# Free tier providers land in PR-2.3a (Exa: 1K req/mo)
-search: ~  # null — no provider configured yet; route handlers return 503 until set
+# Exa: free tier 1000 requests/month. Requires KITCHEN_EXA_API_KEY.
+search: exa
 
 # Scraping — JS-rendered page → structured text
 # Firecrawl: free tier 1000 credits/month. Requires KITCHEN_FIRECRAWL_API_KEY.
